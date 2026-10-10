@@ -288,6 +288,137 @@ export async function streamChatCompletions(
   return full
 }
 
+/**
+ * 修复模式：把生成后校验未通过的 HTML（含具体语法错误）回喂给模型，
+ * 仅修复语法/结构错误，不改玩法逻辑，输出完整可运行的单文件 HTML。
+ * 用于提升“生成 → 入库”的成功率，避免因为偶发的 JS 语法错误而丢弃整局生成。
+ */
+const REPAIR_SYSTEM_PROMPT = `你是一位资深前端游戏开发者。下面是一段【单文件 HTML 游戏】代码，它目前存在 JavaScript 语法错误，无法在浏览器中运行。
+
+请只修复这些语法错误，不要改动游戏的玩法、样式与其余逻辑，也不要新增功能。
+修复后请只输出【完整、可直接运行、单文件的 HTML 代码本身】（不要使用 markdown 代码围栏 \`\`\`）。`
+
+export async function repairGameHtml(
+  html: string,
+  errors: string[],
+  overrides: AiOverrides & { temperature?: number; idleTimeoutMs?: number; maxTimeoutMs?: number } = {},
+  onToken?: (delta: string) => void
+): Promise<string> {
+  const config = useRuntimeConfig()
+  const baseUrl = (overrides.baseUrl || process.env.AI_BASE_URL || config.aiBaseUrl || '').replace(/\/$/, '')
+  const apiKey = overrides.apiKey || process.env.AI_API_KEY || (config.aiApiKey as string) || ''
+  const model = overrides.model || process.env.AI_MODEL || (config.aiModel as string) || 'gpt-4o-mini'
+
+  if (!baseUrl) throw new Error('未配置 AI_BASE_URL')
+  if (!apiKey) throw new Error('未配置 AI_API_KEY（可在生成时填写你自己的 key）')
+
+  const idleTimeoutMs = Number(overrides.idleTimeoutMs ?? 120000)
+  const maxTimeoutMs = Number(overrides.maxTimeoutMs ?? 600000)
+  const messages: ChatMessage[] = [
+    { role: 'system', content: REPAIR_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `以下 HTML 存在这些错误，请修复后输出完整修正版：\n${errors.join('\n')}\n\n原始 HTML：\n\n${html}`
+    }
+  ]
+
+  // 复用流式读取与看门狗逻辑
+  const idleAbort = new AbortController()
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
+  const maxTimer = setTimeout(() => {
+    reader?.cancel?.().catch(() => {})
+    idleAbort.abort()
+  }, maxTimeoutMs)
+  let reader: any = null
+  const resetIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer)
+    idleTimer = setTimeout(() => {
+      idleAbort.abort()
+      reader?.cancel?.().catch(() => {})
+    }, idleTimeoutMs)
+  }
+  resetIdle()
+
+  const url = `${baseUrl}/chat/completions`
+  const body = JSON.stringify({ model, messages, temperature: overrides.temperature ?? 0.3, stream: true })
+
+  let res
+  try {
+    res = await undiciFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'User-Agent': 'GameHub/1.0 (Nuxt-Server)',
+        Accept: 'text/event-stream, application/json, */*'
+      },
+      body,
+      signal: idleAbort.signal
+    })
+  } catch (e: any) {
+    if (idleTimer) clearTimeout(idleTimer)
+    clearTimeout(maxTimer)
+    if (idleAbort.signal.aborted) {
+      throw new Error('AI 接口在修复过程中无响应（超时），请稍后重试')
+    }
+    throw e
+  }
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '')
+    throw new Error(`AI 接口返回 ${res.status}: ${txt.slice(0, 600)}`)
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let full = ''
+  reader = res.body?.getReader?.()
+  if (!reader) {
+    const text = await res.text().catch(() => '')
+    return parseSse(text, onToken)
+  }
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      resetIdle()
+      buffer += decoder.decode(value as Uint8Array, { stream: true })
+      const r = drain(buffer, onToken)
+      buffer = r.rest
+      full += r.got
+      if (r.done) break
+    }
+  } finally {
+    if (idleTimer) clearTimeout(idleTimer)
+    clearTimeout(maxTimer)
+    try {
+      reader.releaseLock()
+    } catch {
+      /* ignore */
+    }
+  }
+  const rest = buffer.trim()
+  if (rest.startsWith('data:')) {
+    const data = rest.slice(5).trim()
+    if (data && data !== '[DONE]') {
+      try {
+        const json = JSON.parse(data)
+        const delta: string | undefined = json.choices?.[0]?.delta?.content
+        if (delta) {
+          full += delta
+          onToken?.(delta)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  if (idleAbort.signal.aborted) {
+    throw new Error('AI 接口在修复过程中无响应（超时），请稍后重试')
+  }
+  return full
+}
+
 /** 解析 SSE 文本缓冲区，返回已解析内容、剩余缓冲与是否结束 */
 function drain(buf: string, onToken?: (delta: string) => void): { got: string; rest: string; done: boolean } {
   let got = ''

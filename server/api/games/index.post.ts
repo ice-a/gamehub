@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb'
-import { buildGameMessages, streamChatCompletions, type AiOverrides } from '~/server/utils/ai'
+import { buildGameMessages, streamChatCompletions, repairGameHtml, type AiOverrides } from '~/server/utils/ai'
 
 function stripFences(text: string): string {
   const fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i)
@@ -94,12 +94,31 @@ export default defineEventHandler(async (event) => {
     // 兜底修正：补齐 charset / viewport / 撑满样式，避免乱码与被裁切
     html = normalizeGameHtml(html)
 
-    // 3) 可运行性校验
+    // 3) 可运行性校验（含自动修复重试）
     send('status', { phase: 'validating', message: '校验 HTML 可运行性…' })
-    const result = validateGameHtml(html)
+    let result = validateGameHtml(html)
+    const MAX_REPAIR = 2
+    for (let attempt = 1; attempt <= MAX_REPAIR && !result.ok; attempt++) {
+      console.warn('[generate] 校验未通过，尝试自动修复（第', attempt, '次）:', result.errors.join('；'))
+      send('status', { phase: 'repairing', message: `生成的 HTML 有语法问题，正在自动修复（第 ${attempt}/${MAX_REPAIR} 次）…` })
+      try {
+        const fixed = await repairGameHtml(
+          html,
+          result.errors,
+          { ...ai, temperature: 0.3, idleTimeoutMs: 120000, maxTimeoutMs: 600000 },
+          (delta) => send('token', { delta })
+        )
+        html = normalizeGameHtml(stripFences(fixed).trim())
+        result = validateGameHtml(html)
+      } catch (e: any) {
+        console.error('[generate] 自动修复失败:', e?.message)
+        send('error', { message: `生成的 HTML 未通过校验且自动修复失败：${result.errors.join('；')}` })
+        return res.end()
+      }
+    }
     if (!result.ok) {
-      console.error('[generate] 校验失败:', result.errors.join('；'))
-      send('error', { message: `生成的 HTML 未通过校验：${result.errors.join('；')}` })
+      console.error('[generate] 多次修复后仍校验失败:', result.errors.join('；'))
+      send('error', { message: `生成的 HTML 多次修复仍不通过校验：${result.errors.join('；')}` })
       return res.end()
     }
 
