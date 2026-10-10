@@ -9,6 +9,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // 服务端私密配置（也可通过.env覆盖）
     mongodbUri: process.env.MONGODB_URI || 'mongodb://192.168.28.9:27017',
+    mongodbDb: process.env.MONGODB_DB || 'gamehub',
     aiApiKey: process.env.AI_API_KEY || '',
     aiBaseUrl: process.env.AI_BASE_URL || 'https://api.openai.com/v1',
     aiModel: process.env.AI_MODEL || 'gpt-4o-mini',
