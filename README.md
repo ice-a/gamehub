@@ -22,6 +22,28 @@ AI 驱动的**单文件 HTML 小游戏**生成与分享平台。用一句话描�
 
 ---
 
+## 📸 演示
+
+> 以下截图来自本地运行实例（生产构建，`localhost:3000`）。
+
+![GameHub 演示](docs/screenshots/demo.gif)
+
+### 页面截图
+
+| 首页（热门游戏） | 创建游戏（含「一键优化提示词」） |
+| --- | --- |
+| ![首页](docs/screenshots/01-index.png) | ![创建游戏](docs/screenshots/02-create.png) |
+
+| 游戏详情（可试玩 / 下载 / 联机） | 总榜单 |
+| --- | --- |
+| ![游戏详情](docs/screenshots/03-game-detail.png) | ![榜单](docs/screenshots/04-leaderboard.png) |
+
+| 多人联机大厅 | 我的收藏 |
+| --- | --- |
+| ![联机](docs/screenshots/05-rooms.png) | ![收藏](docs/screenshots/06-favorites.png) |
+
+---
+
 ## 🧱 技术栈
 
 - **Nuxt 3**（前后端一体，Nitro 服务端）
