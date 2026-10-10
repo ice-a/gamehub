@@ -14,7 +14,8 @@ AI 驱动的**单文件 HTML 小游戏**生成与分享平台。用一句话描�
 - **风格选择**：复古像素 / 赛博霓虹 / 休闲卡通 / 极简 / 像素冒险 / 解谜。
 - **内容安全检测**：生成前对描述做内容审核。
 - **可运行性校验**：自动补齐 `charset` / `viewport`、强制撑满容器布局、禁止外部资源、脚本语法校验，避免乱码与显示不全。
-- **榜单**：单游戏榜单 + 总榜（按游玩时长）。
+- **榜单**：单游戏榜单 + 总榜（按游玩时长）；游戏通过桥接自动上报分数参与排行。
+- **问题举报与自动隐藏**：玩家可在游戏详情页「⚠ 提交问题」举报 bug / 不当内容；同一用户去重计次，**累计达 5 次举报自动隐藏该游戏**（从列表、搜索、收藏、榜单中过滤）。
 - **收藏**：用户可收藏游戏（基于 `username + sign` 签名校验，防伪造）。
 - **用户系统**：`uuid.v4` 匿名用户，可设置用户名，资料可分享。
 - **自带 AI 配置**：用户可临时填入自己的 `baseUrl / apiKey / model`，仅本次生成使用，不落库。
@@ -136,7 +137,8 @@ node .output/server/index.mjs
 | `GET  /api/games/:id` | 游戏详情 |
 | `GET  /api/games/:id/download` | 下载单文件 HTML |
 | `POST /api/optimize-prompt` | 优化提示词（独立模型，返回 `{ text }`） |
-| `POST /api/games/:id/play` | 记录游玩（热度/时长） |
+| `POST /api/games/:id/play` | 记录游玩（热度/时长/分数） |
+| `POST /api/games/:id/report` | 举报游戏问题（去重计次，达阈值自动隐藏） |
 | `POST /api/games/:id/favorite` | 收藏 / 取消收藏（签名校验） |
 | `GET  /api/games/:id/leaderboard` | 单游戏榜单 |
 | `GET  /api/leaderboard/total` | 总榜（按游玩时长） |

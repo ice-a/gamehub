@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   const games = db.collection('games')
   const list = favs.length
     ? await games
-        .find({ _id: { $in: favs.map((f) => new ObjectId(f.gameId)) }, status: 'published' }, { projection: { html: 0 } })
+        .find({ _id: { $in: favs.map((f) => new ObjectId(f.gameId)) }, status: 'published', hidden: { $ne: true } }, { projection: { html: 0 } })
         .toArray()
     : []
 

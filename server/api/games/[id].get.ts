@@ -10,6 +10,9 @@ export default defineEventHandler(async (event) => {
   if (!game) {
     throw createError({ statusCode: 404, statusMessage: '游戏不存在' })
   }
+  if (game.hidden) {
+    throw createError({ statusCode: 404, statusMessage: '该游戏因收到多处问题反馈已被隐藏' })
+  }
   return {
     id: String(game._id),
     title: game.title,

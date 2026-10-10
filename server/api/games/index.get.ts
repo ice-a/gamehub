@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(Number(query.limit) || 50, 200)
   const search = query.q ? String(query.q).trim() : ''
 
-  const filter: any = { status: 'published' }
+  const filter: any = { status: 'published', hidden: { $ne: true } }
   if (search) {
     filter.$or = [
       { title: { $regex: search, $options: 'i' } },
