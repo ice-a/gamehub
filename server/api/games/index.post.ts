@@ -45,20 +45,20 @@ export default defineEventHandler(async (event) => {
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders?.()
 
-  let closed = false
-  const ac = new AbortController()
+  // 客户端是否断开：仅用于决定是否继续向客户端推送事件，
+  // 但【不再因此中止生成】——保证即便用户关掉页面/刷新，游戏仍会写入数据库。
+  let clientGone = false
   event.node.req.on('close', () => {
-    closed = true
-    ac.abort()
+    clientGone = true
   })
 
   const send = (eventName: string, data: unknown) => {
-    if (closed) return
+    if (clientGone) return
     try {
       res.write(`event: ${eventName}\n`)
       res.write(`data: ${JSON.stringify(data)}\n\n`)
     } catch {
-      /* 客户端已断开 */
+      /* 客户端已断开，停止推送即可，不影响服务端生成与入库 */
     }
   }
 
@@ -72,6 +72,8 @@ export default defineEventHandler(async (event) => {
     }
 
     // 2) 流式生成
+    // 注意：不把客户端断开信号传给生成过程，避免“用户离开 → 游戏丢失”。
+    // 仅由服务端的空闲看门狗（idleTimeoutMs）判定上游真正卡死才中止。
     send('status', { phase: 'generating', message: 'AI 正在生成游戏，已生成内容见下方（可折叠）…' })
     let html = ''
     try {
@@ -80,12 +82,11 @@ export default defineEventHandler(async (event) => {
           ...ai,
           custom: typeof body.styleCustom === 'string' ? body.styleCustom : undefined
         }),
-        { ...ai, temperature: 0.8, idleTimeoutMs: 90000 },
-        (delta) => send('token', { delta }),
-        ac.signal
+        { ...ai, temperature: 0.8, idleTimeoutMs: 120000, maxTimeoutMs: 900000 },
+        (delta) => send('token', { delta })
       )
     } catch (e: any) {
-      if (closed) return res.end()
+      console.error('[generate] AI 生成失败:', e?.message)
       send('error', { message: `AI 生成失败：${e.message}` })
       return res.end()
     }
@@ -97,11 +98,12 @@ export default defineEventHandler(async (event) => {
     send('status', { phase: 'validating', message: '校验 HTML 可运行性…' })
     const result = validateGameHtml(html)
     if (!result.ok) {
+      console.error('[generate] 校验失败:', result.errors.join('；'))
       send('error', { message: `生成的 HTML 未通过校验：${result.errors.join('；')}` })
       return res.end()
     }
 
-    // 4) 入库
+    // 4) 入库（无论客户端是否还在，都完成写入）
     const db = await getDb()
     const doc = {
       title: extractTitle(html, description),
@@ -117,11 +119,13 @@ export default defineEventHandler(async (event) => {
       updatedAt: new Date()
     }
     const ins = await db.collection('games').insertOne(doc)
+    console.log('[generate] 已入库 gameId=', String(ins.insertedId), 'title=', doc.title)
     send('status', { phase: 'done', message: '生成完成！' })
     send('done', { id: String(ins.insertedId), title: doc.title })
     res.end()
   } catch (e: any) {
-    if (!closed) send('error', { message: e?.message || '生成失败' })
-    res.end()
+    console.error('[generate] 未预期错误:', e?.message)
+    if (!clientGone) send('error', { message: e?.message || '生成失败' })
+    try { res.end() } catch { /* 连接已关闭，忽略 */ }
   }
 })

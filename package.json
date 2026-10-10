@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "acorn": "^8.12.1",
     "mongodb": "^6.10.0",
     "nuxt": "^3.13.2",

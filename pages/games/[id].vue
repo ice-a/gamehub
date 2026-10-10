@@ -3,7 +3,12 @@
     <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
       <div>
         <h1 class="text-2xl font-bold">{{ game.title }}</h1>
-        <p class="text-slate-400 mt-1">{{ game.description }}</p>
+        <p class="text-slate-400 mt-1" :class="{ 'line-clamp-3': !descExpanded }">{{ game.description }}</p>
+        <button
+          v-if="game.description && game.description.length > 60"
+          class="text-brand-400 text-sm mt-1 hover:underline"
+          @click="descExpanded = !descExpanded"
+        >{{ descExpanded ? '收起 ▲' : '展开介绍 ▼' }}</button>
         <div class="flex items-center gap-4 text-sm text-slate-500 mt-2">
           <span>▶ 游玩 {{ game.playCount }}</span>
           <span>👥 {{ game.playerCount }} 人</span>
@@ -90,6 +95,7 @@ const boardLoading = ref(true)
 
 const reportOpen = ref(false)
 const reportReason = ref('')
+const descExpanded = ref(false)
 const reportMsg = ref('')
 const reportOk = ref(false)
 const reporting = ref(false)

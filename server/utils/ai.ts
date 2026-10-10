@@ -111,7 +111,8 @@ const SYSTEM_PROMPT = `你是一位资深前端游戏开发者。请只输出一
 8. 收到请求后直接开始输出 HTML，不要进行任何推理、思考或分析过程，也不要输出思考内容；把全部精力放在生成可运行的游戏代码上。
 9. 游戏必须支持【无限关卡】：玩家通关后自动进入下一关，关卡编号无限递增、永不结束；每一关的地图/敌人/目标必须由程序依据“当前关卡编号”动态生成，禁止只做固定的几关。
 10. 难度必须由游戏自身的“后台逻辑”自动配置并随关卡递增：速度、数量、移动频率、目标值等关键参数用公式随关卡编号自动计算（例如 speed = base + level * k、count = base + level），无需玩家或外部手动设置；确保前期轻松、后期有挑战，但不会出现“瞬间不可能通关”的死局。
-11. 游戏必须上报分数以参与榜单：页面已注入桥接对象 window.__GAMEHUB__。每当玩家得分发生变化（如得分增加、过关、游戏结束时），调用 window.__GAMEHUB__.send({ type: 'score', value: <当前总分，数字> })。例如得分 +10 时调用 window.__GAMEHUB__.send({ type: 'score', value: score })。若游戏确实没有分数概念（纯放松类），可不上报，但绝大多数游戏必须有分数。`
+11. 游戏必须上报分数以参与榜单：页面已注入桥接对象 window.__GAMEHUB__。每当玩家得分发生变化（如得分增加、过关、游戏结束时），调用 window.__GAMEHUB__.send({ type: 'score', value: <当前总分，数字> })。例如得分 +10 时调用 window.__GAMEHUB__.send({ type: 'score', value: score })。若游戏确实没有分数概念（纯放松类），可不上报，但绝大多数游戏必须有分数。
+12. 代码必须精简紧凑：用尽量少的代码实现完整玩法，避免冗余与重复；单文件控制在可运行的最小规模（通常 150～400 行），不要写冗长的注释或多余样式。这样既能保证可运行，也能显著缩短生成时间。`
 
 /** 组装发给 AI 的 messages（生成单文件 HTML 游戏） */
 export function buildGameMessages(
@@ -171,6 +172,13 @@ export async function streamChatCompletions(
   const idleTimeoutMs = Number(overrides.idleTimeoutMs ?? 90000)
   const idleAbort = new AbortController()
   let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+  // 硬上限：防止上游极慢/限流导致生成无限拖尾（如数十分钟）。超时即中止并给出明确提示。
+  const maxTimeoutMs = Number(overrides.maxTimeoutMs ?? 900000)
+  const maxTimer = setTimeout(() => {
+    reader?.cancel?.().catch(() => {})
+    idleAbort.abort()
+  }, maxTimeoutMs)
   let reader: any = null
   const resetIdle = () => {
     if (idleTimer) clearTimeout(idleTimer)
@@ -210,8 +218,9 @@ export async function streamChatCompletions(
     })
   } catch (e: any) {
     if (idleTimer) clearTimeout(idleTimer)
+    clearTimeout(maxTimer)
     if (idleAbort.signal.aborted && !signal?.aborted) {
-      throw new Error('AI 接口在生成过程中无响应（超时），请稍后重试或更换描述')
+      throw new Error('AI 接口在生成过程中无响应（超时），请稍后重试或更换描述/模型')
     }
     throw e
   }
@@ -245,6 +254,7 @@ export async function streamChatCompletions(
     }
   } finally {
     if (idleTimer) clearTimeout(idleTimer)
+    clearTimeout(maxTimer)
     try {
       reader.releaseLock()
     } catch {
