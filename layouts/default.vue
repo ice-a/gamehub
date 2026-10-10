@@ -33,7 +33,7 @@
     </main>
 
     <footer class="border-t border-slate-800 text-center text-xs text-slate-500 py-6">
-      GameHub · Nuxt 全栈游戏平台 · 单文件 HTML 游戏生成与联机
+      GameHub · Nuxt 全栈游戏平台 · 单文件 HTML 游戏生成与分享
     </footer>
 
     <!-- 登录/注册弹窗 -->

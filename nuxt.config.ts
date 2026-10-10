@@ -19,11 +19,7 @@ export default defineNuxtConfig({
     optAiModel: process.env.OPT_AI_MODEL || '',
     optAiTimeoutMs: Number(process.env.OPT_AI_TIMEOUT_MS || 120000),
     appSecret: process.env.APP_SECRET || 'gamehub-default-secret',
-    public: {
-      // 暴露给前端的配置
-      wsPath: '/ws',
-      wsPort: Number(process.env.WS_PORT || 3001)
-    }
+    public: {}
   },
   devtools: { enabled: false },
   compatibilityDate: '2024-09-01',

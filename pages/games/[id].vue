@@ -12,10 +12,6 @@
       <div class="flex items-center gap-2">
         <FavoriteButton :game-id="game.id" />
         <a :href="`/api/games/${game.id}/download`" class="px-3 py-1.5 rounded-md text-sm border border-slate-600 text-slate-300 hover:border-brand-500" download>⬇ 下载 HTML</a>
-        <NuxtLink
-          :to="`/rooms/new?create=1&game=${game.id}`"
-          class="px-3 py-1.5 rounded-md text-sm bg-brand-600 hover:bg-brand-500 text-white"
-        >👥 创建联机房</NuxtLink>
       </div>
     </div>
 

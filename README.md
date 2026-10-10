@@ -1,6 +1,6 @@
 # GameHub 🎮
 
-AI 驱动的**单文件 HTML 小游戏**生成与分享平台。用一句话描述你的游戏创意，AI 即可生成可在浏览器直接运行的单文件 HTML 游戏；平台还提供多人联机、榜单、收藏、用户系统等完整能力。
+AI 驱动的**单文件 HTML 小游戏**生成与分享平台。用一句话描述你的游戏创意，AI 即可生成可在浏览器直接运行的单文件 HTML 游戏；平台还提供榜单、收藏、用户系统等完整能力。
 
 > 用户只需构思游戏创意，无需关心技术细节：系统会自动要求生成的游戏支持**无限关卡**，且**难度随关卡由游戏自身逻辑自动递增**。
 
@@ -14,7 +14,6 @@ AI 驱动的**单文件 HTML 小游戏**生成与分享平台。用一句话描�
 - **风格选择**：复古像素 / 赛博霓虹 / 休闲卡通 / 极简 / 像素冒险 / 解谜。
 - **内容安全检测**：生成前对描述做内容审核。
 - **可运行性校验**：自动补齐 `charset` / `viewport`、强制撑满容器布局、禁止外部资源、脚本语法校验，避免乱码与显示不全。
-- **多人联机**：基于 WebSocket 的 6 位房间码房间，事件双向转发、房主转移。
 - **榜单**：单游戏榜单 + 总榜（按游玩时长）。
 - **收藏**：用户可收藏游戏（基于 `username + sign` 签名校验，防伪造）。
 - **用户系统**：`uuid.v4` 匿名用户，可设置用户名，资料可分享。
@@ -34,13 +33,13 @@ AI 驱动的**单文件 HTML 小游戏**生成与分享平台。用一句话描�
 | --- | --- |
 | ![首页](docs/screenshots/01-index.png) | ![创建游戏](docs/screenshots/02-create.png) |
 
-| 游戏详情（可试玩 / 下载 / 联机） | 总榜单 |
+| 游戏详情（可试玩 / 下载） | 总榜单 |
 | --- | --- |
 | ![游戏详情](docs/screenshots/03-game-detail.png) | ![榜单](docs/screenshots/04-leaderboard.png) |
 
-| 多人联机大厅 | 我的收藏 |
-| --- | --- |
-| ![联机](docs/screenshots/05-rooms.png) | ![收藏](docs/screenshots/06-favorites.png) |
+| 我的收藏 |
+| --- |
+| ![收藏](docs/screenshots/06-favorites.png) |
 
 ---
 
@@ -100,11 +99,10 @@ OPT_AI_API_KEY=优化模型key \
 OPT_AI_BASE_URL=https://优化模型接口/v1 \
 OPT_AI_MODEL=优化模型 \
 APP_SECRET=任意密钥 \
-WS_PORT=3001 \
 node .output/server/index.mjs
 ```
 
-> HTTP 服务监听 **3000**，WebSocket 服务监听 **3001**（路径 `/ws`）。
+> HTTP 服务监听 **3000**。
 > 也可使用 `npm run preview` 预览构建产物。
 
 ---
@@ -123,7 +121,6 @@ node .output/server/index.mjs
 | `OPT_AI_MODEL` | 优化模型名 | 回退到 `AI_MODEL` |
 | `OPT_AI_TIMEOUT_MS` | 优化超时（毫秒） | `120000` |
 | `APP_SECRET` | 用于 `sign` 哈希的盐/密钥 | `gamehub-default-secret` |
-| `WS_PORT` | WebSocket 服务端口 | `3001` |
 
 > 优化模型与主生成模型相互独立：想用不同模型时，只需配置 `OPT_AI_*` 四项即可，互不干扰。
 > 用户在前端「使用我自己的 AI 接口」中临时填写的配置仅作用于当次生成，不会保存。
@@ -146,7 +143,6 @@ node .output/server/index.mjs
 | `POST /api/users/verify` | 用户签名校验 |
 | `GET  /api/users/:id` | 用户资料 |
 | `GET  /api/favorites/:username` | 某用户的收藏列表 |
-| `WS   /ws` | 多人联机（创建/加入 6 位房间码、事件转发、房主转移） |
 
 ---
 
@@ -156,13 +152,12 @@ node .output/server/index.mjs
 gamehub/
 ├─ server/
 │  ├─ api/                 # API 路由（games / users / favorites / leaderboard / optimize-prompt）
-│  ├─ plugins/websocket.ts # 独立 WebSocket 服务（3001）
-│  └─ utils/               # ai / moderation / validateHtml / mongo / auth / rooms
-├─ pages/                  # 页面：create / games/[id] / rooms / leaderboard / favorites / users/[id] / index
+│  └─ utils/               # ai / moderation / validateHtml / mongo / auth
+├─ pages/                  # 页面：create / games/[id] / leaderboard / favorites / users/[id] / index
 ├─ components/             # GameFrame / GameCard / FavoriteButton / StylePicker
-├─ composables/            # useUser / useGameWs
+├─ composables/            # useUser
 ├─ assets/css/main.css     # Tailwind 入口
-├─ scripts/                # seed / smoke / ws 测试脚本
+├─ scripts/                # seed / smoke 测试脚本
 ├─ nuxt.config.ts
 └─ .env.example
 ```
@@ -173,7 +168,6 @@ gamehub/
 
 ```bash
 node scripts/smoke.mjs          # 用户/收藏/榜单 流程测试
-node scripts/ws_smoke.mjs       # WebSocket 联机测试
 node scripts/test_normalize.mjs # HTML 规范化（charset/viewport）单测
 node scripts/seed.mjs           # 插入示例游戏
 ```
