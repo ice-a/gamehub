@@ -17,3 +17,6 @@ gen5_sse.txt
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# Playwright 快照/临时目录
+.playwright-cli/
